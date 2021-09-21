@@ -1,0 +1,14 @@
+
+INPUT(a)
+INPUT(b)
+INPUT(c)
+INPUT(d)
+
+e = NAND(a, b)
+x = OR(e, f)
+f = AND(b, c)
+g = NOT(c)
+y = AND(f, g, d)
+
+OUTPUT(x)
+OUTPUT(y)
