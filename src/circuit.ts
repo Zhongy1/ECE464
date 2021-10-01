@@ -667,11 +667,11 @@ export class Circuit {
             this.clearFaults();
             this.insertFault(Parser.parseFault(fault));
             this.simulateWithInput(inputStr);
-            console.log(fault);
-            console.table(this.outputs);
+            // console.log(fault);
+            // console.table(this.outputs);
             if (this.isFaultDetected()) {
                 r.push(fault);
-                console.log('detected');
+                // console.log('detected');
             }
         });
 

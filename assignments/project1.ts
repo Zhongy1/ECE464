@@ -115,13 +115,13 @@ export class Project1 {
                             console.log('Coverage by groups:');
                             console.time('t1');
                             let fCvg = this.circuit!.getFaultCoverageWithInputByGroups(this.testVector!);
-                            console.log(fCvg);
+                            // console.log(fCvg);
                             console.log(fCvg.length + ' faults');
                             console.timeEnd('t1');
                             console.log('Coverage individually:');
                             console.time('t2');
                             let fCvgS = this.circuit!.getFaultCoverageWithInputIndividually(this.testVector!);
-                            console.log(fCvgS);
+                            // console.log(fCvgS);
                             console.log(fCvgS.length + ' faults');
                             console.timeEnd('t2');
                             // fCvg?.forEach(fault => {
