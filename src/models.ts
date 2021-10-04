@@ -43,7 +43,7 @@ export interface FaultCoverageDetails {
     testVector: string,
     allOutputs?: { [fault: Fault]: { [node: CircuitNode]: NodeSignal } },
     coveredFaults: Fault[],
-    coveredGroupIds: number[],
+    // coveredGroupIds: number[]
 }
 
 export type CircuitNode = string;
@@ -65,6 +65,7 @@ export interface Gate {
 }
 
 export interface NodeInfo {
+    node?: string,
     type: string,
     val: string,
     logic: string,

@@ -4,6 +4,7 @@ import {
     CircuitNode,
     CircuitTable,
     Fault,
+    FaultCoverageDetails,
     FaultDescriptor,
     FaultDetails,
     FaultEquivalenceGroup,
@@ -118,6 +119,7 @@ export class Circuit {
         let t: CircuitTable = {};
         Object.keys(this.inputs).forEach(iNode => {
             t[iNode] = {
+                node: iNode,
                 type: `Input`,
                 val: Parser.signalToSymbol(this.nodes[iNode]),
                 logic: ``,
@@ -128,6 +130,7 @@ export class Circuit {
             if (t.hasOwnProperty(node) || this.outputs.hasOwnProperty(node)) return;
             let gate = this.gates[node];
             t[node] = {
+                node: node,
                 type: `Internal`,
                 val: Parser.signalToSymbol(this.nodes[node]),
                 logic: `${gate.gateType}(${gate.inputs})`,
@@ -138,6 +141,7 @@ export class Circuit {
             let gate = this.gates[oNode];
             if (gate) {
                 t[oNode] = {
+                    node: oNode,
                     type: `Output`,
                     val: Parser.signalToSymbol(this.nodes[oNode]),
                     logic: `${gate.gateType}(${gate.inputs})`,
@@ -146,6 +150,7 @@ export class Circuit {
             }
             else {
                 t[oNode] = {
+                    node: oNode,
                     type: `Output`,
                     val: Parser.signalToSymbol(this.nodes[oNode]),
                     logic: ``,
@@ -287,7 +292,7 @@ export class Circuit {
             if (!gate.inputFault && inputFault) gate.inputFault = inputFault;
             gate.inputsReady++;
             if (gate.inputsReady == gate.inputs.length) { // if all inputs to gate are ready
-                if (gates.length > 1 && !gate.inputFault) { // fan out from node means we have to check gate specific input faults
+                if (!gate.inputFault) { // check gate specific input faults; for collapsed, add (gates.length > 1)
                     gate.inputs.forEach(iNode => {
                         if (gate.inputFault) return;
                         let fLoc = `${gate.output}-${iNode}`;
@@ -300,7 +305,7 @@ export class Circuit {
                     let g = this.handleGateLogic(gate, true);
                     let b = this.handleGateLogic(gate, false);
                     if (g == NodeSignal.UNKNOWN || b == NodeSignal.UNKNOWN) {
-                        // hopefully it never reaches here
+                        // hopefully it never reaches here if inputs are known
                         this.nodes[gate.output] = NodeSignal.UNKNOWN;
                     }
                     else if (g != b) {
@@ -577,45 +582,6 @@ export class Circuit {
         })
     }
 
-    // private getAllAssociatedFaultGroups(fault: Fault): FaultEquivalenceGroup[] {
-    //     let fdet = this.posFaultDetailsMap[fault];
-    //     if (fdet.examined) return [];
-    //     let r: FaultEquivalenceGroup[] = [];
-    //     let grp = this.faultEquivGroups[fdet.groupId];
-    //     grp.coveredFaults.forEach(fault => {
-    //         let fdeta = this.posFaultDetailsMap[fault];
-    //         if (fdeta.examined) return;
-    //         fdeta.examined = true;
-    //         if (!fdeta.dominates) return;
-    //         r = [...r, ...this.getAllAssociatedFaultGroups(fdeta.dominates)];
-    //     });
-    //     return [...r, grp];
-    // }
-
-    // public getFaultCoverageWithInputByGroups(inputStr: string, details?: any): Fault[] {
-    //     let oldFaults = this.faults;
-
-    //     let r: Fault[] = [];
-    //     this.resetFaultDetails();
-    //     this.possibleFaults.forEach(fault => {
-    //         let fdet = this.posFaultDetailsMap[fault];
-    //         if (fdet.examined) return;
-    //         this.clearFaults();
-    //         this.insertFault(Parser.parseFault(fault));
-    //         this.simulateWithInput(inputStr);
-    //         if (this.isFaultDetected()) {
-    //             let grps = this.getAllAssociatedFaultGroups(fault);
-    //             grps.forEach(grp => {
-    //                 r = [...r, ...grp.coveredFaults];
-    //             });
-    //         }
-    //     });
-    //     this.resetFaultDetails();
-
-    //     this.faults = oldFaults;
-    //     return r;
-    // }
-
     private getAllAssociatedFaultGroups(fault: Fault, collector: FaultEquivalenceGroup[]): void {
         let fdet = this.posFaultDetailsMap[fault];
         if (fdet.examined) return;
@@ -631,8 +597,11 @@ export class Circuit {
         collector.push(grp);
     }
 
-    public getFaultCoverageWithInputByGroups(inputStr: string, details?: any): Fault[] {
+    public getFaultCoverageWithInputByGroups(inputStr: string, details?: FaultCoverageDetails): Fault[] {
         let oldFaults = this.faults;
+        if (details) {
+            details.testVector = inputStr;
+        }
 
         let r: Fault[] = [];
         this.resetFaultDetails();
@@ -647,14 +616,25 @@ export class Circuit {
                 this.getAllAssociatedFaultGroups(fault, grps);
                 grps.forEach(grp => {
                     grp.coveredFaults.forEach(f => {
+                        if (details && details.allOutputs) {
+                            let o: { [node: CircuitNode]: NodeSignal } = {};
+                            Object.keys(this.outputs).forEach(oNode => {
+                                o[oNode] = this.outputs[oNode];
+                            });
+                            details.allOutputs[f] = o;
+                        }
                         r.push(f);
-                    })
+                    });
                 });
             }
         });
         this.resetFaultDetails();
 
         this.faults = oldFaults;
+
+        if (details) {
+            details.coveredFaults = r;
+        }
         return r;
     }
 
@@ -663,17 +643,111 @@ export class Circuit {
 
         let r: Fault[] = [];
         this.possibleFaults.forEach(fault => {
-            let fdet = this.posFaultDetailsMap[fault];
             this.clearFaults();
             this.insertFault(Parser.parseFault(fault));
             this.simulateWithInput(inputStr);
-            // console.log(fault);
-            // console.table(this.outputs);
             if (this.isFaultDetected()) {
                 r.push(fault);
-                // console.log('detected');
             }
         });
+
+        this.faults = oldFaults;
+        return r;
+    }
+
+    public doAdditional4TVs(inputStr: string): string[] {
+        let self = this;
+        let oldFaults = this.faults;
+
+        console.log('TV: ' + inputStr);
+        let r: Fault[] = [];
+        this.resetFaultDetails();
+        doCoverage(inputStr);
+        function doCoverage(iStr: string): void {
+            self.possibleFaults.forEach(fault => {
+                let fdet = self.posFaultDetailsMap[fault];
+                if (fdet.examined) return;
+                self.clearFaults();
+                self.insertFault(Parser.parseFault(fault));
+                self.simulateWithInput(iStr);
+                if (self.isFaultDetected()) {
+                    let grps: FaultEquivalenceGroup[] = [];
+                    self.getAllAssociatedFaultGroups(fault, grps);
+                    grps.forEach(grp => {
+                        grp.coveredFaults.forEach(f => {
+                            r.push(f);
+                        })
+                    });
+                }
+            });
+        }
+        function generateRandomTV(): string[] {
+            let s = [];
+            for (let i = 0; i < self.numInputs; i++) {
+                s[i] = '' + Math.floor(Math.random() * 2);
+            }
+            return s;
+        }
+        function tryCoverage(iStr: string): Fault[] {
+            let r: Fault[] = [];
+            self.possibleFaults.forEach(fault => {
+                let fdet = self.posFaultDetailsMap[fault];
+                if (fdet.examined) return;
+                self.clearFaults();
+                self.insertFault(Parser.parseFault(fault));
+                self.simulateWithInput(iStr);
+                if (self.isFaultDetected()) {
+                    let grps: FaultEquivalenceGroup[] = [];
+                    self.getAllAssociatedFaultGroups(fault, grps);
+                    grps.forEach(grp => {
+                        grp.coveredFaults.forEach(f => {
+                            r.push(f);
+                        })
+                    });
+                }
+            });
+            r.forEach(fault => {
+                self.posFaultDetailsMap[fault].examined = false;
+            });
+            return r;
+        }
+        function attemptOptimize(tv: string[]): void {
+            if (self.possibleFaults.length > 2000) return;
+            let inc = 1;
+            if (self.numInputs > 36) {
+                inc = Math.floor(self.numInputs / 36);
+            }
+            for (let i = 0; i < tv.length; i += inc) { // try to optimize random tvs
+                tv[i] = '0';
+                let cvg0 = tryCoverage(tv.join(''));
+                tv[i] = '1';
+                let cvg1 = tryCoverage(tv.join(''));
+                if (cvg0.length == cvg1.length) {
+                    tv[i] = '' + Math.floor(Math.random() * 2);
+                }
+                else if (cvg0.length > cvg1.length) {
+                    tv[i] = '0';
+                }
+                else if (cvg0.length < cvg1.length) {
+                    tv[i] = '1';
+                }
+            }
+        }
+
+        let all0s = [];
+        for (let i = 0; i < this.numInputs; i++) {
+            all0s.push('0');
+        }
+        attemptOptimize(all0s);
+        console.log('TV: ' + all0s.join(''));
+        doCoverage(all0s.join(''));
+
+        for (let i = 0; i < 3; i++) { // 3 random tvs
+            let tv = generateRandomTV();
+            attemptOptimize(tv);
+            console.log('TV: ' + tv.join(''));
+            doCoverage(tv.join(''));
+        }
 
         this.faults = oldFaults;
         return r;

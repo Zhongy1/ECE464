@@ -2,8 +2,34 @@ import * as fs from 'fs';
 import { Circuit } from '../src/circuit';
 import { CLI } from "../src/cli";
 import { Menu } from "../src/cli-models";
-import { CircuitDescriptor } from '../src/models';
+import { CircuitDescriptor, FaultCoverageDetails, NodeInfo } from '../src/models';
 import { Parser } from '../src/parser';
+import { printTable, Table } from 'console-table-printer';
+
+const p = new Table({
+    columns: [
+        { name: 'node', color: 'blue' },
+        { name: 'type', color: 'blue' },
+        { name: 'val', color: 'blue' },
+        { name: 'logic', color: 'blue' },
+        { name: 'debug', color: 'blue' },
+    ],
+    sort: (row1, row2) => {
+        if (row1.type == 'Input' && row2.type != 'Input') {
+            return -1;
+        }
+        if (row1.type == 'Internal' && row2.type == 'Input') {
+            return 1;
+        }
+        if (row1.type == 'Internal' && row2.type == 'Output') {
+            return -1;
+        }
+        if (row1.type == 'Output' && row2.type != 'Output') {
+            return 1;
+        }
+        return 0;
+    },
+});
 
 export class Project1 {
     public menuOptions!: Menu[];
@@ -77,11 +103,19 @@ export class Project1 {
                     {
                         trigger: /^i -{0,1}\d+$/,
                         transition: (cli: CLI) => {
-                            let inp = (parseInt(cli.getValueFromCurrentMenu().match(/-{0,1}\d+/)![0]) >>> 0).toString(2);
+                            let num = cli.getValueFromCurrentMenu().match(/-{0,1}\d+/)![0];
+                            let inp = (parseInt(num) >>> 0).toString(2);
                             let lengthRemaining = this.circuit!.numInputs - inp.length;
                             if (lengthRemaining > 0) {
-                                for (let i = 0; i < lengthRemaining; i++) {
-                                    inp = '0' + inp;
+                                if (/-/.test(num)) {
+                                    for (let i = 0; i < lengthRemaining; i++) {
+                                        inp = '1' + inp;
+                                    }
+                                }
+                                else {
+                                    for (let i = 0; i < lengthRemaining; i++) {
+                                        inp = '0' + inp;
+                                    }
                                 }
                             }
                             else if (lengthRemaining < 0) {
@@ -113,24 +147,19 @@ export class Project1 {
                             // do D2
                             cli.printDebug('Doing D2');
                             console.log('Coverage by groups:');
-                            console.time('t1');
-                            let fCvg = this.circuit!.getFaultCoverageWithInputByGroups(this.testVector!);
-                            // console.log(fCvg);
-                            console.log(fCvg.length + ' faults');
-                            console.timeEnd('t1');
-                            console.log('Coverage individually:');
-                            console.time('t2');
-                            let fCvgS = this.circuit!.getFaultCoverageWithInputIndividually(this.testVector!);
-                            // console.log(fCvgS);
-                            console.log(fCvgS.length + ' faults');
-                            console.timeEnd('t2');
-                            // fCvg?.forEach(fault => {
-                            //     this.circuit?.clearFaults();
-                            //     this.circuit?.insertFault(Parser.parseFault(fault));
-                            //     this.circuit?.simulateWithInput(this.testVector!);
-                            //     console.log('Fault: ' + fault);
-                            //     console.dir(this.circuit?.outputs);
-                            // });
+                            let details: FaultCoverageDetails = {
+                                testVector: '',
+                                allOutputs: {},
+                                coveredFaults: []
+                            }
+                            let fCvg = this.circuit!.getFaultCoverageWithInputByGroups(this.testVector!, details);
+                            // console.log('details all outputs length: ' + Object.keys(details.allOutputs!).length)
+                            console.log(fCvg.length + ' faults covered');
+                            let f = 'Fault list: \n';
+                            f += this.circuit!.possibleFaults.join('\n') + '\n';
+                            f += 'Total covered faults: ' + fCvg.length + '\n';
+                            f += JSON.stringify(details, null, 2);
+                            fs.writeFileSync('out.txt', f);
 
                             return 'D3';
                         }
@@ -140,8 +169,13 @@ export class Project1 {
                         transition: (cli: CLI) => {
                             // do E1
                             cli.printDebug('Doing E1');
+                            console.log('Total faults: ' + this.circuit?.possibleFaults.length);
                             // do E2
                             cli.printDebug('Doing E2');
+                            console.time('t3');
+                            let fCvg = this.circuit!.doAdditional4TVs(this.testVector!);
+                            console.log(fCvg.length + ' faults');
+                            console.timeEnd('t3');
                             return 'E3';
                         }
                     },
@@ -162,6 +196,8 @@ export class Project1 {
                             this.circuit?.insertFault(Parser.parseFault(cli.getValueFromCurrentMenu()));
                             this.circuit?.simulateWithInput(this.testVector!);
                             this.printCircuitInfo();
+                            cli.printDebug('Fault has been detected: ' + this.circuit!.isFaultDetected());
+                            fs.writeFileSync('out.txt', this.circuit!.toString());
                             return 'C3';
                         }
                     }
@@ -253,7 +289,7 @@ export class Project1 {
 
     public printCircuitInfo() {
         if (this.circuit) {
-            console.table(this.circuit.toTable());
+            console.table(this.circuit!.toTable());
         }
         else {
             console.log('Circuit has not been initialized...')
