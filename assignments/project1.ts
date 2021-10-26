@@ -60,7 +60,8 @@ export class Project1 {
                                 try {
                                     this.initCircuit(Parser.parseBench(bench));
                                 }
-                                catch {
+                                catch (err) {
+                                    console.log(err);
                                     cli.printError('An error occured while parcing file. Terminating...');
                                     return 'q';
                                 }
@@ -169,6 +170,7 @@ export class Project1 {
                         transition: (cli: CLI) => {
                             // do E1
                             cli.printDebug('Doing E1');
+                            console.log(this.circuit?.possibleFaults);
                             console.log('Total faults: ' + this.circuit?.possibleFaults.length);
                             // do E2
                             cli.printDebug('Doing E2');

@@ -86,7 +86,7 @@ export class CLI {
         if (/^$/.test(inpStr) && menu.default) {
             inpStr = menu.default;
         }
-        if (/q/.test(inpStr)) {
+        if (/^q$/.test(inpStr)) {
             menu.inValue = inpStr;
             this.terminate();
         }

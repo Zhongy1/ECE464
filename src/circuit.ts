@@ -496,7 +496,7 @@ export class Circuit {
         function attemptGrouping(fault: Fault) {
             if (!map.hasOwnProperty(fault)) return;
             let fdet = map[fault];
-            if (fdet.groupId > 0) return;
+            if (fdet.groupId >= 0) return;
             fdet.groupId = id;
             self.faultEquivGroups[id].coveredFaults.push(fault);
             if (!fdet.descriptor.inputTo) {
@@ -562,7 +562,7 @@ export class Circuit {
         }
         faults.forEach(fault => {
             let fdet = map[fault];
-            if (fdet.groupId > 0) return;
+            if (fdet.groupId >= 0) return;
             this.faultEquivGroups.push({
                 id: id,
                 coveredFaults: [],
