@@ -1,5 +1,5 @@
-import { Project1 } from "./assignments/project1";
+import { Project2 } from "./assignments/project2";
 
-let p1 = new Project1();
+let p2 = new Project2();
 
-p1.main();
+p2.main();

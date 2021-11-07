@@ -137,6 +137,18 @@ export class CLI {
         });
     }
 
+    public printInfo(str: string): void {
+        let strParts = str.match(/.*\n|.+$/g)!;
+        let s = '\x1b[1m\x1b[34m❯ [Info]\x1b[0m ';
+        strParts.forEach(part => {
+            s += part;
+            if (/\n/.test(part)) {
+                s += '\x1b[1m\x1b[34m┃\x1b[0m ';
+            }
+        });
+        console.log(s);
+    }
+
     public printError(str: string): void {
         let strParts = str.match(/.*\n|.+$/g)!;
         let s = '\x1b[1m\x1b[31m❯ [Error]\x1b[0m ';

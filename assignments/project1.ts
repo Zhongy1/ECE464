@@ -2,34 +2,8 @@ import * as fs from 'fs';
 import { Circuit } from '../src/circuit';
 import { CLI } from "../src/cli";
 import { Menu } from "../src/cli-models";
-import { CircuitDescriptor, FaultCoverageDetails, NodeInfo } from '../src/models';
 import { Parser } from '../src/parser';
-import { printTable, Table } from 'console-table-printer';
-
-const p = new Table({
-    columns: [
-        { name: 'node', color: 'blue' },
-        { name: 'type', color: 'blue' },
-        { name: 'val', color: 'blue' },
-        { name: 'logic', color: 'blue' },
-        { name: 'debug', color: 'blue' },
-    ],
-    sort: (row1, row2) => {
-        if (row1.type == 'Input' && row2.type != 'Input') {
-            return -1;
-        }
-        if (row1.type == 'Internal' && row2.type == 'Input') {
-            return 1;
-        }
-        if (row1.type == 'Internal' && row2.type == 'Output') {
-            return -1;
-        }
-        if (row1.type == 'Output' && row2.type != 'Output') {
-            return 1;
-        }
-        return 0;
-    },
-});
+import { CircuitDescriptor, FaultCoverageDetails } from '../src/models';
 
 export class Project1 {
     public menuOptions!: Menu[];
@@ -43,7 +17,7 @@ export class Project1 {
         this.cli = new CLI(this.menuOptions, this.menuOptions[0].id);
     }
 
-    private initMenuOptions() {
+    private initMenuOptions(): void {
         this.menuOptions = [
             {
                 id: 'A1',
@@ -280,7 +254,7 @@ export class Project1 {
         this.cli.run();
     }
 
-    public getBenchFile(fileName: string): string {
+    private getBenchFile(fileName: string): string {
         if (!fs.existsSync(`./464benches/${fileName}`)) return '';
         return fs.readFileSync(`./464benches/${fileName}`, { encoding: 'utf8', flag: 'r' });
     }
@@ -289,7 +263,7 @@ export class Project1 {
         this.circuit = new Circuit(circDesc);
     }
 
-    public printCircuitInfo() {
+    public printCircuitInfo(): void {
         if (this.circuit) {
             console.table(this.circuit!.toTable());
         }

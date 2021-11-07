@@ -12,6 +12,7 @@ import {
     GateType,
     NodeInfo,
     NodeSignal,
+    SCOAPInfo,
 } from './models'
 import { Parser } from './parser';
 
@@ -22,6 +23,7 @@ export class Circuit {
     public faults!: { [node: CircuitNode]: NodeSignal };
     public gates!: { [node: CircuitNode]: Gate };
     public nodeToGatesMap!: { [node: CircuitNode]: Gate[] };
+    public nodesSCOAP: { [node: CircuitNode]: SCOAPInfo }
 
     public numInputs!: number;
     public numOutputs!: number;
@@ -38,15 +40,23 @@ export class Circuit {
         this.faults = {};
         this.gates = {};
         this.nodeToGatesMap = {};
+        this.nodesSCOAP = {};
         this.initializeCircuit();
         this.possibleFaults = this.getAllPossibleFaults();
         this.posFaultDetailsMap = Parser.parseFaultList(this.possibleFaults);
         this.initializeFaultDetails(this.posFaultDetailsMap);
+        this.initializeSCOAPDetails();
     }
     private initializeCircuit(): void {
         this.circDescriptor.inputs.forEach(ioDesc => {
             this.nodes[ioDesc.node] = NodeSignal.UNTOUCHED;
             this.inputs[ioDesc.node] = NodeSignal.UNTOUCHED;
+            this.nodesSCOAP[ioDesc.node] = {
+                c0: 0,
+                c1: 0,
+                n0: 0,
+                n1: 0
+            }
         });
         this.numInputs = this.circDescriptor.inputs.length;
         this.circDescriptor.outputs.forEach(ioDesc => {
@@ -55,6 +65,12 @@ export class Circuit {
         this.numOutputs = this.circDescriptor.outputs.length;
         this.circDescriptor.gates.forEach(gateDesc => {
             this.nodes[gateDesc.outputNode] = NodeSignal.UNTOUCHED;
+            this.nodesSCOAP[gateDesc.outputNode] = {
+                c0: 0,
+                c1: 0,
+                n0: 0,
+                n1: 0
+            }
             this.gates[gateDesc.outputNode] = {
                 gateType: gateDesc.gateType,
                 inputs: gateDesc.params,
@@ -115,46 +131,73 @@ export class Circuit {
         return s;
     }
 
-    public toTable(): CircuitTable {
+    public toTable(showCounts: boolean): CircuitTable {
         let t: CircuitTable = {};
         Object.keys(this.inputs).forEach(iNode => {
+            let info = this.nodesSCOAP[iNode];
             t[iNode] = {
-                node: iNode,
+                // node: iNode,
                 type: `Input`,
-                val: Parser.signalToSymbol(this.nodes[iNode]),
+                // val: Parser.signalToSymbol(this.nodes[iNode]),
                 logic: ``,
-                debug: ``
+                c0: info.c0,
+                c1: info.c1,
+                // debug: ``
+            }
+            if (showCounts) {
+                t[iNode].n0 = info.n0;
+                t[iNode].n1 = info.n1;
             }
         });
         Object.keys(this.nodes).forEach(node => {
             if (t.hasOwnProperty(node) || this.outputs.hasOwnProperty(node)) return;
             let gate = this.gates[node];
+            let info = this.nodesSCOAP[node];
             t[node] = {
-                node: node,
+                // node: node,
                 type: `Internal`,
-                val: Parser.signalToSymbol(this.nodes[node]),
+                // val: Parser.signalToSymbol(this.nodes[node]),
                 logic: `${gate.gateType}(${gate.inputs})`,
-                debug: `{${gate.inputs.map(node => Parser.signalToSymbol(this.nodes[node]))}} -> ${gate.gateType} -> {${Parser.signalToSymbol(this.nodes[gate.output])}}`
+                c0: info.c0,
+                c1: info.c1,
+                // debug: `{${gate.inputs.map(node => Parser.signalToSymbol(this.nodes[node]))}} -> ${gate.gateType} -> {${Parser.signalToSymbol(this.nodes[gate.output])}}`
+            }
+            if (showCounts) {
+                t[node].n0 = info.n0;
+                t[node].n1 = info.n1;
             }
         });
         Object.keys(this.outputs).forEach(oNode => {
             let gate = this.gates[oNode];
+            let info = this.nodesSCOAP[oNode];
             if (gate) {
                 t[oNode] = {
-                    node: oNode,
+                    // node: oNode,
                     type: `Output`,
-                    val: Parser.signalToSymbol(this.nodes[oNode]),
+                    // val: Parser.signalToSymbol(this.nodes[oNode]),
                     logic: `${gate.gateType}(${gate.inputs})`,
-                    debug: `{${gate.inputs.map(node => Parser.signalToSymbol(this.nodes[node]))}} -> ${gate.gateType} -> {${Parser.signalToSymbol(this.nodes[gate.output])}}`
+                    c0: info.c0,
+                    c1: info.c1,
+                    // debug: `{${gate.inputs.map(node => Parser.signalToSymbol(this.nodes[node]))}} -> ${gate.gateType} -> {${Parser.signalToSymbol(this.nodes[gate.output])}}`
+                }
+                if (showCounts) {
+                    t[oNode].n0 = info.n0;
+                    t[oNode].n1 = info.n1;
                 }
             }
             else {
                 t[oNode] = {
-                    node: oNode,
+                    // node: oNode,
                     type: `Output`,
-                    val: Parser.signalToSymbol(this.nodes[oNode]),
+                    // val: Parser.signalToSymbol(this.nodes[oNode]),
                     logic: ``,
-                    debug: `{${Parser.signalToSymbol(this.nodes[oNode])}}`
+                    c0: info.c0,
+                    c1: info.c1,
+                    // debug: `{${Parser.signalToSymbol(this.nodes[oNode])}}`
+                }
+                if (showCounts) {
+                    t[oNode].n0 = info.n0;
+                    t[oNode].n1 = info.n1;
                 }
             }
         });
@@ -175,6 +218,14 @@ export class Circuit {
         });
         Object.keys(this.nodes).forEach(node => {
             this.nodes[node] = NodeSignal.UNTOUCHED;
+        });
+    }
+
+    private resetCounters(): void {
+        Object.keys(this.nodesSCOAP).forEach(node => {
+            let info = this.nodesSCOAP[node];
+            info.n0 = 0;
+            info.n1 = 0;
         });
     }
 
@@ -370,12 +421,6 @@ export class Circuit {
                     i++;
                 }
             });
-
-            Object.keys(this.outputs).forEach(oNode => {
-                this.outputs[oNode] = this.nodes[oNode];
-            });
-
-            return true;
         }
         else {
             let inp = Object.keys(this.inputs); // map of input nodes and their values
@@ -395,13 +440,26 @@ export class Circuit {
                 }
                 this.informGatesParamReady(iNode);
             });
-
-            Object.keys(this.outputs).forEach(oNode => {
-                this.outputs[oNode] = this.nodes[oNode];
-            });
-
-            return true;
         }
+
+        Object.keys(this.outputs).forEach(oNode => {
+            this.outputs[oNode] = this.nodes[oNode];
+        });
+
+        if (Object.keys(this.faults).length == 0) {
+            Object.keys(this.nodes).forEach(node => {
+                let val = this.nodes[node];
+                let info = this.nodesSCOAP[node];
+                if (val == NodeSignal.LOW) {
+                    info.n0++;
+                }
+                else if (val == NodeSignal.HIGH) {
+                    info.n1++;
+                }
+            });
+        }
+
+        return true;
     }
 
     public isFaultDetected(): boolean {
@@ -751,5 +809,166 @@ export class Circuit {
 
         this.faults = oldFaults;
         return r;
+    }
+
+    private handleGateControllability(gate: Gate, signal: NodeSignal.LOW | NodeSignal.HIGH): number {
+        if (gate.gateType === 'AND') {
+            if (signal == NodeSignal.LOW) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c0;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val = Math.min(this.nodesSCOAP[gate.inputs[i]].c0, val);
+                }
+                return val + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c1;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val += this.nodesSCOAP[gate.inputs[i]].c1;
+                }
+                return val + 1;
+            }
+        }
+        else if (gate.gateType === 'NAND') {
+            if (signal == NodeSignal.LOW) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c1;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val += this.nodesSCOAP[gate.inputs[i]].c1;
+                }
+                return val + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c0;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val = Math.min(this.nodesSCOAP[gate.inputs[i]].c0, val);
+                }
+                return val + 1;
+            }
+        }
+        else if (gate.gateType === 'OR') {
+            if (signal == NodeSignal.LOW) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c0;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val += this.nodesSCOAP[gate.inputs[i]].c0;
+                }
+                return val + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c1;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val = Math.min(this.nodesSCOAP[gate.inputs[i]].c1, val);
+                }
+                return val + 1;
+            }
+        }
+        else if (gate.gateType === 'NOR') {
+            if (signal == NodeSignal.LOW) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c1;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val = Math.min(this.nodesSCOAP[gate.inputs[i]].c1, val);
+                }
+                return val + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                let val = this.nodesSCOAP[gate.inputs[0]].c0;
+                for (let i = 1; i < gate.inputs.length; i++) {
+                    val += this.nodesSCOAP[gate.inputs[i]].c0;
+                }
+                return val + 1;
+            }
+        }
+        else if (gate.gateType === 'XOR') {
+            let val = 1;
+            let minDiff = Number.MAX_VALUE;
+            let even1s = true;
+            for (let i = 0; i < gate.inputs.length; i++) {
+                let info = this.nodesSCOAP[gate.inputs[i]];
+                val += Math.min(info.c0, info.c1);
+                if (info.c1 < info.c0) {
+                    even1s != even1s;
+                }
+                minDiff = Math.min(minDiff, Math.abs(info.c0 - info.c1));
+            }
+            if (signal == NodeSignal.LOW) {
+                if (even1s) {
+                    return val;
+                }
+                return val + minDiff;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                if (even1s) {
+                    return val + minDiff;
+                }
+                return val;
+            }
+        }
+        else if (gate.gateType === 'XNOR') {
+            let val = 1;
+            let minDiff = Number.MAX_VALUE;
+            let even1s = true;
+            for (let i = 0; i < gate.inputs.length; i++) {
+                let info = this.nodesSCOAP[gate.inputs[i]];
+                val += Math.min(info.c0, info.c1);
+                if (info.c1 < info.c0) {
+                    even1s != even1s;
+                }
+                minDiff = Math.min(minDiff, Math.abs(info.c0 - info.c1));
+            }
+            if (signal == NodeSignal.LOW) {
+                if (even1s) {
+                    return val + minDiff;
+                }
+                return val;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                if (even1s) {
+                    return val;
+                }
+                return val + minDiff;
+            }
+        }
+        else if (gate.gateType === 'NOT') {
+            if (signal == NodeSignal.LOW) {
+                return this.nodesSCOAP[gate.inputs[0]].c1 + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                return this.nodesSCOAP[gate.inputs[0]].c0 + 1;
+            }
+        }
+        else if (gate.gateType === 'BUFF') {
+            if (signal == NodeSignal.LOW) {
+                return this.nodesSCOAP[gate.inputs[0]].c0 + 1;
+            }
+            else if (signal == NodeSignal.HIGH) {
+                return this.nodesSCOAP[gate.inputs[0]].c1 + 1;
+            }
+        }
+        return 0;
+    }
+
+    private informGatesCtrlReady(node: CircuitNode): void {
+        let gates = this.nodeToGatesMap[node];
+        gates.forEach(gate => {
+            gate.inputsReady++;
+            if (gate.inputsReady == gate.inputs.length) {
+                let info = this.nodesSCOAP[gate.output];
+                info.c0 = this.handleGateControllability(gate, NodeSignal.LOW);
+                info.c1 = this.handleGateControllability(gate, NodeSignal.HIGH);
+
+                if (!this.outputs.hasOwnProperty(gate.output)) {
+                    this.informGatesCtrlReady(gate.output);
+                }
+            }
+        });
+    }
+
+    private initializeSCOAPDetails(): void {
+        Object.keys(this.inputs).forEach(iNode => {
+            let info = this.nodesSCOAP[iNode];
+            info.c0 = 1;
+            info.c1 = 1;
+            this.informGatesCtrlReady(iNode);
+        });
+
+        this.resetCircuit();
     }
 }

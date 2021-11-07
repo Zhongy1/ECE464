@@ -64,11 +64,22 @@ export interface Gate {
     inputFault: boolean
 }
 
+export interface SCOAPInfo {
+    c0: number,
+    c1: number,
+    n0: number,
+    n1: number
+}
+
 export interface NodeInfo {
     node?: string,
     type: string,
-    val: string,
+    val?: string,
     logic: string,
-    debug: string
+    c0?: number,
+    c1?: number,
+    n0?: number,
+    n1?: number,
+    debug?: string,
 }
 export type CircuitTable = { [node: string]: NodeInfo }
