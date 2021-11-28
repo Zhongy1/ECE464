@@ -9,9 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/ip": "^1.1.0",
     "@types/node": "^16.7.8",
     "@types/readline-sync": "^1.4.4",
+    "ip": "^1.1.5",
     "readline-sync": "^1.4.10",
+    "socket.io": "^4.4.0",
+    "socket.io-client": "^4.4.0",
     "src": "^1.1.2",
     "table": "^6.7.2",
     "typescript": "^4.4.2"

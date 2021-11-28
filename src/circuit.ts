@@ -33,6 +33,8 @@ export class Circuit {
     public posFaultDetailsMap: { [fault: Fault]: FaultDetails };
     public faultEquivGroups!: FaultEquivalenceGroup[];
 
+    public doCounting: boolean;
+
     constructor(public circDescriptor: CircuitDescriptor) {
         this.nodes = {};
         this.inputs = {};
@@ -46,6 +48,8 @@ export class Circuit {
         this.posFaultDetailsMap = Parser.parseFaultList(this.possibleFaults);
         this.initializeFaultDetails(this.posFaultDetailsMap);
         this.initializeSCOAPDetails();
+
+        this.doCounting = false;
     }
     private initializeCircuit(): void {
         this.circDescriptor.inputs.forEach(ioDesc => {
@@ -202,6 +206,22 @@ export class Circuit {
             }
         });
         return t;
+    }
+
+    public getOutputStr(zeroUnknowns: boolean = false): string {
+        let r = ''
+        Object.keys(this.outputs).forEach(node => {
+            if (this.outputs[node] == NodeSignal.HIGH || this.outputs[node] == NodeSignal.DNOT && zeroUnknowns) {
+                r += '1'
+            }
+            else {
+                if (zeroUnknowns) {
+                    r += '0'
+                }
+                else r += Parser.signalToSymbol(this.outputs[node]);
+            }
+        });
+        return r;
     }
 
     private resetCircuit(): void {
@@ -450,11 +470,13 @@ export class Circuit {
             Object.keys(this.nodes).forEach(node => {
                 let val = this.nodes[node];
                 let info = this.nodesSCOAP[node];
-                if (val == NodeSignal.LOW) {
-                    info.n0++;
-                }
-                else if (val == NodeSignal.HIGH) {
-                    info.n1++;
+                if (this.doCounting) {
+                    if (val == NodeSignal.LOW) {
+                        info.n0++;
+                    }
+                    else if (val == NodeSignal.HIGH) {
+                        info.n1++;
+                    }
                 }
             });
         }

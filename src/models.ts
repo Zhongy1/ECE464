@@ -83,3 +83,11 @@ export interface NodeInfo {
     debug?: string,
 }
 export type CircuitTable = { [node: string]: NodeInfo }
+
+
+export interface LfsrDescriptor {
+    size: number;
+    seed: string;
+    misr?: boolean;
+    startingInput: string;
+}
