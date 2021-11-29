@@ -16,10 +16,10 @@ function main() {
     }
 
     let vCpuCount = os.cpus().length;
-    let workerCount = (vCpuCount > 1) ? vCpuCount - 1 : 1;
-    console.log(`${vCpuCount} vCPUs detected; creating ${workerCount} local workers`);
+    let workerCount = (vCpuCount > 1) ? vCpuCount : 1;
+    console.log(`${vCpuCount} vCPUs detected; creating ${workerCount} remote workers`);
     for (let i = 0; i < workerCount; i++) {
-        let worker = fork('worker.ts', ['-t', target, '-p', `${port}`]);
+        let worker = fork('assignments/project3/worker.ts', ['-t', target, '-p', `${port}`]);
     }
 }
 

@@ -1,2 +1,4 @@
 node_modules/
 out.txt
+.DS_STORE
+screenshots/

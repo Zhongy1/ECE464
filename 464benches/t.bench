@@ -1,0 +1,6 @@
+INPUT(1)
+INPUT(5)
+
+OUTPUT(6)
+
+6 = XOR(1, 5)

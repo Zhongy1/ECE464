@@ -25,7 +25,7 @@ export class Project3Worker {
         this.socket.on('connect', () => {
             console.log('[Worker] Connection successful');
         });
-        this.socket.on('error', (err) => {
+        this.socket.on('error', (err: any) => {
             console.log('[Worker] Error connecting');
         });
         this.socket.on('disconnect', () => {
